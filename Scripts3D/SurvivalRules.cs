@@ -32,10 +32,11 @@ public sealed class SurvivalRules
     public bool Advance(double delta)
     {
         if (Complete || !double.IsFinite(delta) || delta <= 0) return false;
-        int previousPhase = PhaseIndex;
         Elapsed = Math.Min(DurationSeconds, Elapsed + delta);
         if (Complete) return false; // No spawn at or after the victory boundary.
-        if (PhaseIndex != previousPhase) _nextSpawn = Elapsed;
+        // A phase change only changes the parameters used after the next scheduled
+        // spawn. It never starts an immediate replacement wave or touches enemies
+        // that are already alive.
         if (Elapsed + 1e-9 < _nextSpawn) return false;
         _nextSpawn = Elapsed + Current.Interval;
         return true;

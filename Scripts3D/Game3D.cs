@@ -14,7 +14,6 @@ public partial class Game3D : Node3D
 	private SurvivalHud _hud = null!;
 	private string _result = "";
 	private int _phaseSpawnCount;
-	private int _lastPhase;
 
 	private readonly RandomNumberGenerator _rng =
 		new();
@@ -90,11 +89,6 @@ public partial class Game3D : Node3D
             FinishGame("VICTORY - Survived 60 seconds!");
             return;
         }
-        if (_lastPhase != _survival.PhaseIndex)
-        {
-            _lastPhase = _survival.PhaseIndex;
-            _phaseSpawnCount = 0;
-        }
         if (spawnDue) SpawnBatch();
         RefreshHud();
     }
@@ -114,7 +108,6 @@ public partial class Game3D : Node3D
         _score = 0;
         _survival = new SurvivalRules();
         _phaseSpawnCount = 0;
-        _lastPhase = 0;
         _result = "";
         _running = true;
         _player.ResetPlayer(new Vector3(0f, 0.5f, 0f));
