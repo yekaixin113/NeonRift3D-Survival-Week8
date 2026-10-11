@@ -1,0 +1,10 @@
+Neon Rift final reconstructed repository verification
+Run date: 11 October 2026
+SDK: Godot.NET.Sdk/4.7.0; target: net8.0
+All four reconstructed feature/debug stages: build success, zero errors.
+Existing nullable-annotation warnings remain in Player3D and Bullet3D.
+Final isolated Godot 4.7 .NET integration: SURVIVAL_CHECKS_OK: 344 assertions
+Final source/config/docs matched the fixed supplied game before repository links were added.
+Five original combat classes and all scenes: byte-identical.
+Five branches and four two-parent merges retained.
+Human gameplay balance, aiming feel and HUD readability: not measured.

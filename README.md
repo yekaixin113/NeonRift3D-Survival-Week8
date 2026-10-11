@@ -80,3 +80,9 @@ At 60 seconds, a living player wins before further spawning or later actor updat
 in that tick. A death already received ends the run as defeat. Results are final;
 enemies/projectiles freeze and R reloads a fresh scene. Paused simulation does not
 advance the timer. Balance is a bounded first-pass tuning, not a measured win rate.
+
+## Collaboration and iteration record
+
+This repository organises the completed survival changes into five retained branches and four explicit merges reconstructed on 11 October 2026. See [the project plan](Documentation/PROJECT_PLAN.md), [the branch and merge record](Documentation/BRANCH_AND_MERGE_RECORD.md) and [the history provenance](Documentation/HISTORY_PROVENANCE.md).
+
+The [English change report](Documentation/Survival_Mode_Change_Report_EN.docx) includes the balance rationale, annotated initial code and final persistence fix. [Verification](Documentation/FINAL_VERIFICATION.txt) records the final 344-assertion Godot run. Use `main` or `v1.0-survival-fixed` for the final gameplay.
