@@ -11,6 +11,7 @@ public partial class Game3D : Node3D
 {
 	// SURVIVAL S3: keep coordination here, balance in a plain C# object.
 	private SurvivalRules _survival = new();
+	private SurvivalHud _hud = null!;
 	private string _result = "";
 	private int _phaseSpawnCount;
 	private int _lastPhase;
@@ -67,6 +68,9 @@ public partial class Game3D : Node3D
 		_player.Died +=
 			EndWithDefeat;
 
+		_hud = new SurvivalHud();
+		AddChild(_hud);
+
 		StartGame();
 	}
 
@@ -87,6 +91,14 @@ public partial class Game3D : Node3D
         }
         if (spawnDue) SpawnBatch();
         RefreshHud();
+    }
+
+    // Restart is available only after a result; no input-map/scene edit needed.
+    public override void _UnhandledKeyInput(InputEvent @event)
+    {
+        if (!_running && @event is InputEventKey key
+            && key.Pressed && !key.Echo && key.Keycode == Key.R)
+            GetTree().ReloadCurrentScene();
     }
 
     private void StartGame()
@@ -286,7 +298,8 @@ public partial class Game3D : Node3D
 
     private void RefreshHud()
     {
-        // Console-only version; the HUD is integrated on the Member B branch.
+        _hud.Refresh(_survival, _player.Health, _kills, _score,
+            CountEnemies(), _result);
     }
 
 	private void ClearEntities()
