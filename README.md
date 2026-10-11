@@ -8,20 +8,20 @@ Godot APIs, and GitHub collaboration. All source-code comments are in English.
 1. Open this directory as a project in a compatible Godot 4 .NET editor.
 2. Build the C# project in Godot, then run `Scenes3D/Main3D.tscn`.
 3. Use **W/A/S/D** to move; **move the mouse** to aim; hold **left mouse button** to shoot.
-4. Observe kills, score, victory, and defeat messages in the **Godot Output panel**.
+4. Read the on-screen survival timer, health, pressure tier, enemies, kills and score. Press **R** after victory or defeat to restart.
 
-The project targets `Godot.NET.Sdk/4.7.2` and `net8.0` as in the supplied
-project. The assembly is named `NeonRiftStage1` for compatibility; this
+The project targets `Godot.NET.Sdk/4.7.0` and `net8.0`. The original 4.7.2 SDK reference
+was adjusted to match the installed Godot 4.7 .NET editor and cached SDK. The assembly is named `NeonRiftStage1` for compatibility; this
 legacy assembly name is **not** the current gameplay stage or dimension.
 
 ## Game rules (values defined by our C# code)
 
 | Rule | Value | File |
 | --- | --- | --- |
-| Victory | Defeat 10 enemies | `Game3D.cs` |
+| Victory | Stay alive for 60 simulation seconds | `SurvivalRules.cs`, `Game3D.cs` |
 | Initial enemy spawn | 1.5 s after start | `Game3D.cs` |
-| Subsequent spawns | Every 2.5 s | `Game3D.cs` |
-| Enemy progression | Chasers while kills < 4; Strikers from 4 onward | `Game3D.cs` |
+| Subsequent spawns | Six 10-second tiers; bounded batches and living-enemy caps | `SurvivalRules.cs` |
+| Enemy progression | Time-based mixed batches; at most 4 living Strikers | `SurvivalRules.cs`, `Game3D.cs` |
 | Player max health | 100 HP | `Player3D.cs` |
 | Player movement | 7 world units/s | `Player3D.cs` |
 | Player firing rate | 5 shots/s (0.2 s apart) | `Player3D.cs` |
@@ -51,9 +51,32 @@ from `7f` to `8.5f`; also update the corresponding comment.
 These independent edits are normally **mergeable** because they modify
 different files. To intentionally demonstrate a **merge conflict**, let
 both students branch from the same commit and change
-`Game3D.cs`'s `TargetKills = 10` line to different values. Merge one
+`SurvivalRules.cs`'s `DurationSeconds = 60.0` line to different values. Merge one
 branch into `main` first, then merge the other **without first reconciling
 those conflicting changes**; Git may require manual resolution. The
 existence of two pull requests alone does not necessarily create a conflict.
 
 For detailed call flow, signals, and collision layers, see `ARCHITECTURE.md`.
+
+## Survival balance
+
+| Seconds | Batch interval | Batch size | Living cap | Striker cap | Striker slot |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 0–10 | 2.5 s | 1 | 6 | 0 | None |
+| 10–20 | 2.0 s | 1 | 8 | 1 | Every fifth successful spawn |
+| 20–30 | 2.0 s | 2 | 10 | 2 | Every fourth |
+| 30–40 | 1.5 s | 2 | 12 | 3 | Every fourth |
+| 40–50 | 1.25 s | 3 | 14 | 4 | Every third |
+| 50–60 | 1.0 s | 3 | 16 | 4 | Every third |
+
+First spawn: 1.5 seconds. A new tier does not force an immediate wave: enemies
+already alive keep their instance, current health and behaviour, and the new
+tier's interval starts after the next naturally scheduled spawn. There are no
+catch-up bursts.
+Slots blocked by caps or safe placement are discarded. Striker slots fall back to
+Chasers when the ranged cap is reached. Spawn points stay at least 5 units from
+the player and 1.4 units from living enemies, with 16 attempts per slot.
+At 60 seconds, a living player wins before further spawning or later actor updates
+in that tick. A death already received ends the run as defeat. Results are final;
+enemies/projectiles freeze and R reloads a fresh scene. Paused simulation does not
+advance the timer. Balance is a bounded first-pass tuning, not a measured win rate.

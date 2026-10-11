@@ -2,7 +2,7 @@
 
 This is a **3D** Godot 4 C# project. `Node3D`, `CharacterBody3D`, `Camera3D`,
 `PackedScene`, input handling, collision functions, and the engine lifecycle are
-**Godot-provided APIs**. The six classes in `Scripts3D/` are **our own C# code**.
+**Godot-provided APIs**. The eight top-level classes in `Scripts3D/` are **our own C# code**.
 
 ## Main flow
 
@@ -36,9 +36,8 @@ Each Godot physics tick:
 - `Enemy3D.Destroyed` -> `Game3D.OnEnemyDestroyed()`
 
 Godot's `[Signal]` and `EmitSignal()` mechanism is engine-provided; **the events,
-their meaning, and the handlers are designed in our code**. No HUD or dash
-mechanics are implemented in this Week 8 3D demo. Status and outcomes are
-printed to Godot's output panel.
+their meaning, and the handlers are designed in our code**. SurvivalHud displays status and results; no dash mechanic is implemented.
+Outcomes are also printed to Godot's output panel.
 
 ## Collision configuration
 
@@ -61,3 +60,22 @@ Y is vertical. `Vector3` and `CharacterBody3D` are appropriate here.
 **MD5 is a cryptographic hash algorithm, not a Godot 3D movement/model class.**
 There is no MD5 reference in this project; it should not be confused with 3D,
 `Node3D`, or `CharacterBody3D`.
+
+## Survival extension responsibilities
+
+- Game3D: integrates the clock, spawn requests, placement/caps, existing actor signals,
+  result finalisation and HUD. This remains a coordinator, not a single-purpose class.
+- SurvivalRules: pure C# timing and six-tier difficulty data; no scene or UI dependency.
+- SurvivalHud: display only; receives values and never decides victory or spawning.
+- Player3D, Enemy3D, ChaserEnemy3D, StrikerEnemy3D, Bullet3D: unchanged.
+- Scene files: unchanged; Game3D adds one CanvasLayer/Label HUD at runtime.
+
+Crossing a ten-second pressure boundary never clears or recreates `Entities`.
+Living enemy instances remain in the scene with their current health and continue
+moving naturally from their current position; only later spawn requests use the
+new phase parameters. The continuous spawn
+sequence also avoids resetting the Striker cadence at a phase boundary.
+
+Tune future duration/phase balance in SurvivalRules; add new combat behaviours in
+the relevant enemy class. A future separate SpawnDirector is justified if placement
+or multiple modes grow, but is deliberately not introduced for this small change.
