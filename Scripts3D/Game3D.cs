@@ -78,6 +78,12 @@ public partial class Game3D : Node3D
     public override void _PhysicsProcess(double deltaValue)
     {
         if (!_running) return;
+        if (!_player.Active || _player.Health <= 0f)
+        {
+            EndWithDefeat();
+            return;
+        }
+
         bool spawnDue = _survival.Advance(deltaValue);
         if (_survival.Complete)
         {
@@ -249,6 +255,9 @@ public partial class Game3D : Node3D
 		float speed,
 		float damage)
 	{
+		// SURVIVAL S7: late signals cannot create projectiles after the result.
+		if (!_running) return;
+
 		Bullet3D bullet =
 			_bulletScene.Instantiate<Bullet3D>();
 
@@ -285,13 +294,14 @@ public partial class Game3D : Node3D
         FinishGame("DEFEAT - Player defeated");
     }
 
-    // SURVIVAL S9: one result path; freezing is added in the next debug iteration.
+    // SURVIVAL S9: one terminal path, freezes enemies and existing bullets too.
     private void FinishGame(string result)
     {
         if (!_running) return;
         _running = false;
         _result = result;
         _player.Active = false;
+        _entities.ProcessMode = ProcessModeEnum.Disabled;
         GD.Print($"{result} | Time: {_survival.Elapsed:F2}s | Score: {_score}");
         RefreshHud();
     }
