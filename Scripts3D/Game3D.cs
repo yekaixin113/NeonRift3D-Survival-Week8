@@ -1,7 +1,7 @@
 // TEACHING GUIDE: Game3D is OUR game coordinator; Node3D and PackedScene are GODOT.
 // GODOT API: _Ready, _PhysicsProcess, GD.Load, GetNode, Instantiate, AddChild.
-// OUR RULES: first spawn at 1.5 s, then every 2.5 s; win after 10 kills;
-// first four kills unlock Strikers for all subsequent spawns; score depends on enemy type.
+// SURVIVAL S3: survive 60 seconds; six time-based pressure tiers.
+// Rules live in SurvivalRules; combat classes and score values are unchanged.
 // WORLD UNITS: speeds are Godot 3D units per second, not pixels per second.
 
 using Godot;
@@ -9,8 +9,11 @@ using System;
 
 public partial class Game3D : Node3D
 {
-	// OUR victory condition: the player must defeat 10 enemies.
-	private const int TargetKills = 10;
+	// SURVIVAL S3: keep coordination here, balance in a plain C# object.
+	private SurvivalRules _survival = new();
+	private string _result = "";
+	private int _phaseSpawnCount;
+	private int _lastPhase;
 
 	private readonly RandomNumberGenerator _rng =
 		new();
@@ -25,7 +28,6 @@ public partial class Game3D : Node3D
 
 	private Player3D _player = null!;
 
-	private float _spawnTimer;
 
 	private int _kills;
 
@@ -68,70 +70,100 @@ public partial class Game3D : Node3D
 		StartGame();
 	}
 
-	public override void _PhysicsProcess(
-		double deltaValue)
-	{
-		if (!_running)
-		{
-			return;
-		}
+	// SURVIVAL S4: use simulation seconds without the old 0.033-second truncation.
+    public override void _PhysicsProcess(double deltaValue)
+    {
+        if (!_running) return;
+        bool spawnDue = _survival.Advance(deltaValue);
+        if (_survival.Complete)
+        {
+            FinishGame("VICTORY - Survived 60 seconds!");
+            return;
+        }
+        if (_lastPhase != _survival.PhaseIndex)
+        {
+            _lastPhase = _survival.PhaseIndex;
+            _phaseSpawnCount = 0;
+        }
+        if (spawnDue) SpawnBatch();
+        RefreshHud();
+    }
 
-		float delta = Math.Min(
-			(float)deltaValue,
-			0.033f);
+    private void StartGame()
+    {
+        ClearEntities();
+        _kills = 0;
+        _score = 0;
+        _survival = new SurvivalRules();
+        _phaseSpawnCount = 0;
+        _lastPhase = 0;
+        _result = "";
+        _running = true;
+        _player.ResetPlayer(new Vector3(0f, 0.5f, 0f));
+        RefreshHud();
+    }
 
-		_spawnTimer -= delta;
+    // SURVIVAL S5: caps count living enemies, never bullets or queued deaths.
+    private int CountEnemies(bool strikersOnly = false)
+    {
+        int count = 0;
+        foreach (Node child in _entities.GetChildren())
+            if (child is Enemy3D enemy && !enemy.IsQueuedForDeletion()
+                && enemy.Health > 0f && (!strikersOnly || enemy is StrikerEnemy3D))
+                count++;
+        return count;
+    }
 
-		if (_spawnTimer <= 0f)
-		{
-			SpawnEnemy();
+    private void SpawnBatch()
+    {
+        SurvivalRules.Phase phase = _survival.Current;
+        for (int i = 0; i < phase.BatchSize; i++)
+        {
+            if (CountEnemies() >= phase.EnemyCap) break;
+            // Failed/blocked slots are discarded, not accumulated.
+            if (!TryGetSpawnPosition(out Vector3 position)) continue;
+            _phaseSpawnCount++;
+            bool striker = phase.StrikerEvery > 0
+                && _phaseSpawnCount % phase.StrikerEvery == 0
+                && CountEnemies(true) < phase.StrikerCap;
+            SpawnEnemy(striker ? _strikerScene : _chaserScene, position);
+        }
+    }
 
-			// OUR spawning interval: one enemy every 2.5 seconds.
-			_spawnTimer = 2.5f;
-		}
-	}
+    private void SpawnEnemy(PackedScene scene, Vector3 position)
+    {
+        Enemy3D enemy = scene.Instantiate<Enemy3D>();
+        _entities.AddChild(enemy);
+        enemy.GlobalPosition = position;
+        enemy.Configure(_player);
+        enemy.Destroyed += OnEnemyDestroyed;
+        enemy.ShotRequested += SpawnEnemyBullet;
+    }
 
-	private void StartGame()
-	{
-		ClearEntities();
-
-		_kills = 0;
-
-		_score = 0;
-
-		// OUR opening delay: spawn first enemy 1.5 seconds after game start.
-		_spawnTimer = 1.5f;
-
-		_running = true;
-
-		_player.ResetPlayer(
-			new Vector3(0f, 0.5f, 0f));
-	}
-
-	private void SpawnEnemy()
-	{
-		PackedScene selectedScene =
-			// OUR progression: spawn Chasers while kills = 0..3; then Strikers.
-			_kills < 4
-				? _chaserScene
-				: _strikerScene;
-
-		Enemy3D enemy =
-			selectedScene.Instantiate<Enemy3D>();
-
-		_entities.AddChild(enemy);
-
-		enemy.GlobalPosition =
-			RandomArenaEdgePosition();
-
-		enemy.Configure(_player);
-
-		enemy.Destroyed +=
-			OnEnemyDestroyed;
-
-		enemy.ShotRequested +=
-			SpawnEnemyBullet;
-	}
+    // SURVIVAL S6: retain edge spawning; reject unfair/overlapping positions.
+    private bool TryGetSpawnPosition(out Vector3 position)
+    {
+        for (int attempt = 0; attempt < 16; attempt++)
+        {
+            Vector3 candidate = RandomArenaEdgePosition();
+            if (candidate.DistanceTo(_player.GlobalPosition)
+                < SurvivalRules.MinimumPlayerDistance) continue;
+            bool occupied = false;
+            foreach (Node child in _entities.GetChildren())
+            {
+                if (child is Enemy3D enemy && !enemy.IsQueuedForDeletion()
+                    && enemy.Health > 0f && candidate.DistanceTo(enemy.GlobalPosition)
+                        < SurvivalRules.MinimumEnemySpacing)
+                {
+                    occupied = true;
+                    break;
+                }
+            }
+            if (!occupied) { position = candidate; return true; }
+        }
+        position = Vector3.Zero;
+        return false;
+    }
 
 	private Vector3 RandomArenaEdgePosition()
 	{
@@ -232,31 +264,30 @@ public partial class Game3D : Node3D
 
 		_score += points;
 
-		GD.Print(
-			$"Kills: {_kills}/{TargetKills}"
-			+ $" | Score: {_score}");
+        // SURVIVAL S8: kills award score only; they never end a survival run.
+        GD.Print($"Kills: {_kills} | Score: {_score}");
+    }
 
-		if (_kills >= TargetKills)
-		{
-			_running = false;
+    private void EndWithDefeat()
+    {
+        FinishGame("DEFEAT - Player defeated");
+    }
 
-			_player.Active = false;
+    // SURVIVAL S9: one result path; freezing is added in the next debug iteration.
+    private void FinishGame(string result)
+    {
+        if (!_running) return;
+        _running = false;
+        _result = result;
+        _player.Active = false;
+        GD.Print($"{result} | Time: {_survival.Elapsed:F2}s | Score: {_score}");
+        RefreshHud();
+    }
 
-			GD.Print("VICTORY");
-		}
-	}
-
-	private void EndWithDefeat()
-	{
-		if (!_running)
-		{
-			return;
-		}
-
-		_running = false;
-
-		GD.Print("GAME OVER!!!!");
-	}
+    private void RefreshHud()
+    {
+        // Console-only version; the HUD is integrated on the Member B branch.
+    }
 
 	private void ClearEntities()
 	{
